@@ -2,6 +2,41 @@ import numpy as np
 from util import *
 import pickle
 
+class MatMul:
+    def __init__(self, W):
+        self.params = [W]
+        self.grads = [np.zeros_like(W)]
+        self.x = None
+    
+    def forward(self, x):
+        W = self.params[0]
+        self.x = x
+        
+        return np.dot(x, W)
+     
+    def backward(self, dout):
+        W = self.params[0]
+        dx = np.dot(dout, W.T)
+        dW = np.dot(self.x.T, dout)
+        self.grads[0][...] = dW
+        
+        return dx
+         
+class Sigmoid:
+    def __init__(self):
+        self.params = []
+        self.grads = []
+        self.x = None
+        self.out = None
+        
+    def forward(self, x):
+        self.x = x
+        self.out = 1 / (1 + np.exp(-self.x))
+        return self.out
+    
+    def backward(self, dout):
+        return dout * (self.out * (1 - self.out))
+
 class ReLU:
     def __init__(self):
         self.x = None
@@ -13,18 +48,6 @@ class ReLU:
     def backward(self, dz):
         return dz*(self.x > 0).astype(int)
     
-class Sigmoid:
-    def __init__(self):
-        self.x = None
-        self.y = None
-        
-    def forward(self, x):
-        self.x = x
-        self.y = 1 / (1 + np.exp(-self.x))
-        return self.y
-    
-    def backward(self, dz):
-        return dz * self.y *(1 - self.y)
     
 class Affine:
     def __init__(self, W, b):
@@ -39,9 +62,13 @@ class Affine:
     
     def backward(self, dout):
         W, _ = self.params
-        self.grads[0][...] = np.dot(self.x.T, dout)
-        self.grads[1][...] = np.sum(dout, axis=0)
+        
+        db = np.sum(dout, sum=0)
+        dW = np.dot(self.x.T, dout)
         dx = np.dot(dout, W.T)
+        
+        self.grads[0][...] = dW
+        self.grads[1][...] = db
         
         return dx
 
@@ -59,16 +86,15 @@ class Softmax_with_Loss:
     
     def backward(self, dout=1):
         batch_size = self.t.shape[0]
-        return (self.y - self.t) / batch_size
-
-    def backward(self, dout=1):
-        batch_size = self.t.shape[0]
-
-        dx = self.y.copy()
-        dx[np.arange(batch_size), self.t] -= 1  # ✅ 핵심 수정
-        dx *= dout
-        dx /= batch_size
-        return dx
+        
+        # one-hot 벡터 레이블, 정수 레이블 모두 호환
+        if self.t.ndim == 1:
+            dx = self.y.copy()
+            dx[np.arange(batch_size), self.t] -= 1
+        else:
+            dx = (self.y - self.t)
+        
+        return dx / batch_size
 
 class Dropout:
     def __init__(self, dropout_ratio=0.5):
